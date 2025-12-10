@@ -1,0 +1,369 @@
+name: Build and Submit
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  android:
+    runs-on: ["app-build-linux-x64"]
+    outputs:
+      version: ${{ steps.meta.outputs.VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - uses: actions/setup-node@v4
+        with:
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@tetherto"
+
+      - name: Install worker dependencies
+        run: |
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          git config --global url."https://".insteadOf ssh://
+          git config --global url."https://${{ secrets.PAT_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+          npm install --install-links --legacy-peer-deps
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      - name: Generate worklet bundle for Android
+        run: npm run bundle:android
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+
+      - name: Write Google Play service account key
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}
+        run: |
+          echo "$GOOGLE_SERVICE_ACCOUNT_KEY_JSON" > $GITHUB_WORKSPACE/google-service-account.json
+
+      - name: Resolve EAS profile by branch
+        id: branch_profile
+        run: |
+          if [ "${GITHUB_REF##*/}" = "main" ]; then
+            PROFILE=production
+          else
+            PROFILE=preview
+          fi
+          echo "PROFILE=$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Read version & enforce semantic versioning
+        id: meta
+        run: |
+          VERSION=$(jq -r '.expo.version' app.json)
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: expo.version ($VERSION) must be MAJOR.MINOR.PATCH." >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Add -dev suffix to expo.version for dev branch (Android)
+        if: github.ref == 'refs/heads/dev'
+        run: |
+          BASE_VERSION="${{ steps.meta.outputs.VERSION }}"
+          DEV_VERSION="${BASE_VERSION%-dev}-dev"
+          tmp=$(mktemp)
+          jq --arg v "$DEV_VERSION" '.expo.version = $v' app.json > "$tmp"
+          mv "$tmp" app.json
+          echo "expo.version updated to: $DEV_VERSION (Android dev build)"
+      - name: Run custom expo prebuild
+        run: npm run custom-prebuild:android
+
+      - name: EAS build (Android local) with auto submit
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_GOOGLE_SERVICE_ACCOUNT_KEY_PATH: "${{ env.GITHUB_WORKSPACE }}/google-service-account.json"
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+          GOOGLE_PLAY_KEYSTORE: ${{ secrets.GOOGLE_PLAY_KEYSTORE }}
+          SLACK_WEBHOOK_URL_PATH: ${{ secrets.SLACK_WEBHOOK_URL_PATH }}
+          GOOGLE_FORM_KEY: ${{ secrets.GOOGLE_FORM_KEY }}
+          GOOGLE_FORM_MAPPING_TIMESTAMP: ${{ secrets.GOOGLE_FORM_MAPPING_TIMESTAMP }}
+          GOOGLE_FORM_MAPPING_TOPIC: ${{ secrets.GOOGLE_FORM_MAPPING_TOPIC }}
+          GOOGLE_FORM_MAPPING_APP: ${{ secrets.GOOGLE_FORM_MAPPING_APP }}
+          GOOGLE_FORM_MAPPING_OPERATING_SYSTEM: ${{ secrets.GOOGLE_FORM_MAPPING_OPERATING_SYSTEM }}
+          GOOGLE_FORM_MAPPING_DEVICE_MODEL: ${{ secrets.GOOGLE_FORM_MAPPING_DEVICE_MODEL }}
+          GOOGLE_FORM_MAPPING_MESSAGE: ${{ secrets.GOOGLE_FORM_MAPPING_MESSAGE }}
+          GOOGLE_FORM_MAPPING_APP_VERSION: ${{ secrets.GOOGLE_FORM_MAPPING_APP_VERSION }}
+          TEST_SLACK_WEBHOOK_URL_PATH: ${{ secrets.TEST_SLACK_WEBHOOK_URL_PATH }}
+          TEST_GOOGLE_FORM_KEY: ${{ secrets.TEST_GOOGLE_FORM_KEY }}
+          TEST_GOOGLE_FORM_MAPPING_TIMESTAMP: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_TIMESTAMP }}
+          TEST_GOOGLE_FORM_MAPPING_TOPIC: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_TOPIC }}
+          TEST_GOOGLE_FORM_MAPPING_APP: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_APP }}
+          TEST_GOOGLE_FORM_MAPPING_OPERATING_SYSTEM: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_OPERATING_SYSTEM }}
+          TEST_GOOGLE_FORM_MAPPING_DEVICE_MODEL: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_DEVICE_MODEL }}
+          TEST_GOOGLE_FORM_MAPPING_MESSAGE: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_MESSAGE }}
+          TEST_GOOGLE_FORM_MAPPING_APP_VERSION: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_APP_VERSION }}
+          IOS_APP_GROUP_ID: ${{ secrets.IOS_APP_GROUP_ID }}
+        run: |
+          mkdir -p android/keystores
+          echo $GOOGLE_PLAY_KEYSTORE | base64 -d > android/keystores/release.keystore
+          echo $CREDENTIALS_JSON | base64 -d > credentials.json
+          # CHANGED: add branch-aware profile
+          eas build --platform android --profile ${{ steps.branch_profile.outputs.PROFILE }} --local --non-interactive
+
+      - name: Build APK for GitHub release (only when production profile)
+        if: steps.branch_profile.outputs.PROFILE == 'production'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas build --platform android --profile preview --local --non-interactive
+
+      - name: Find Android artifacts
+        id: find_android
+        run: |
+          AAB_PATH=$(find $GITHUB_WORKSPACE -name "*.aab" -type f | head -n 1 || true)
+          echo "AAB_PATH=$AAB_PATH" >> $GITHUB_OUTPUT
+          echo "Found AAB at: $AAB_PATH"
+
+          # keep your existing metadata
+          VERSION_CODE=$(jq -r '.expo.android.versionCode' app.json)
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_OUTPUT
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PearPass-Mobile-Android-v${{ steps.meta.outputs.VERSION }}
+          path: |
+            ${{ steps.find_android.outputs.AAB_PATH }}
+          if-no-files-found: ignore
+
+      - name: Submit to Google play via EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_GOOGLE_SERVICE_ACCOUNT_KEY_PATH: "${{ env.GITHUB_WORKSPACE }}/google-service-account.json"
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+          GOOGLE_PLAY_KEYSTORE: ${{ secrets.GOOGLE_PLAY_KEYSTORE }}
+          SLACK_WEBHOOK_URL_PATH: ${{ secrets.SLACK_WEBHOOK_URL_PATH }}
+          GOOGLE_FORM_KEY: ${{ secrets.GOOGLE_FORM_KEY }}
+          GOOGLE_FORM_MAPPING_TIMESTAMP: ${{ secrets.GOOGLE_FORM_MAPPING_TIMESTAMP }}
+          GOOGLE_FORM_MAPPING_TOPIC: ${{ secrets.GOOGLE_FORM_MAPPING_TOPIC }}
+          GOOGLE_FORM_MAPPING_APP: ${{ secrets.GOOGLE_FORM_MAPPING_APP }}
+          GOOGLE_FORM_MAPPING_OPERATING_SYSTEM: ${{ secrets.GOOGLE_FORM_MAPPING_OPERATING_SYSTEM }}
+          GOOGLE_FORM_MAPPING_DEVICE_MODEL: ${{ secrets.GOOGLE_FORM_MAPPING_DEVICE_MODEL }}
+          GOOGLE_FORM_MAPPING_MESSAGE: ${{ secrets.GOOGLE_FORM_MAPPING_MESSAGE }}
+          GOOGLE_FORM_MAPPING_APP_VERSION: ${{ secrets.GOOGLE_FORM_MAPPING_APP_VERSION }}
+          TEST_SLACK_WEBHOOK_URL_PATH: ${{ secrets.TEST_SLACK_WEBHOOK_URL_PATH }}
+          TEST_GOOGLE_FORM_KEY: ${{ secrets.TEST_GOOGLE_FORM_KEY }}
+          TEST_GOOGLE_FORM_MAPPING_TIMESTAMP: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_TIMESTAMP }}
+          TEST_GOOGLE_FORM_MAPPING_TOPIC: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_TOPIC }}
+          TEST_GOOGLE_FORM_MAPPING_APP: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_APP }}
+          TEST_GOOGLE_FORM_MAPPING_OPERATING_SYSTEM: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_OPERATING_SYSTEM }}
+          TEST_GOOGLE_FORM_MAPPING_DEVICE_MODEL: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_DEVICE_MODEL }}
+          TEST_GOOGLE_FORM_MAPPING_MESSAGE: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_MESSAGE }}
+          TEST_GOOGLE_FORM_MAPPING_APP_VERSION: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_APP_VERSION }}
+          IOS_APP_GROUP_ID: ${{ secrets.IOS_APP_GROUP_ID }}
+        run: |
+          if [ -n "${{ steps.find_android.outputs.AAB_PATH }}" ]; then
+            eas submit -p android --path ${{ steps.find_android.outputs.AAB_PATH }} --non-interactive
+          else
+            echo "No AAB found; skipping Android submit."
+          fi
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@tetherto"
+
+      - name: Install Apple WWDRC Authority
+        run: |
+          curl -O https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer
+          sudo security add-trusted-cert -d -r unspecified -k ~/Library/Keychains/login.keychain-db AppleWWDRCAG3.cer
+
+      - name: Install worker dependencies
+        run: |
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          git config --global url."https://".insteadOf ssh://
+          git config --global url."https://${{ secrets.PAT_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+          npm install --install-links --legacy-peer-deps
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      - name: Generate worklet bundle for iOS
+        run: npm run bundle:ios
+  
+      - name: Generate worklet bundle for iOS extension
+        run: npm run bundle:ios-extension
+
+      - name: Extract translations
+        run: |
+          npm run lingui:extract
+          npm run lingui:compile
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+
+      - name: Resolve EAS profile by branch
+        id: branch_profile
+        run: |
+          if [ "${GITHUB_REF##*/}" = "main" ]; then
+            PROFILE=production
+          else
+            PROFILE=preview
+          fi
+          echo "PROFILE=$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Run custom expo prebuild
+        run: npm run custom-prebuild:ios
+
+      - name: EAS build (iOS local) with auto submit
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+          APPLE_PROVISIONING_PROFILE_AUTOFILL: ${{ secrets.APPLE_PROVISIONING_PROFILE_AUTOFILL }}
+          APPLE_DISTRIBUTION_CERTIFICATE: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE }}
+          SLACK_WEBHOOK_URL_PATH: ${{ secrets.SLACK_WEBHOOK_URL_PATH }}
+          GOOGLE_FORM_KEY: ${{ secrets.GOOGLE_FORM_KEY }}
+          GOOGLE_FORM_MAPPING_TIMESTAMP: ${{ secrets.GOOGLE_FORM_MAPPING_TIMESTAMP }}
+          GOOGLE_FORM_MAPPING_TOPIC: ${{ secrets.GOOGLE_FORM_MAPPING_TOPIC }}
+          GOOGLE_FORM_MAPPING_APP: ${{ secrets.GOOGLE_FORM_MAPPING_APP }}
+          GOOGLE_FORM_MAPPING_OPERATING_SYSTEM: ${{ secrets.GOOGLE_FORM_MAPPING_OPERATING_SYSTEM }}
+          GOOGLE_FORM_MAPPING_DEVICE_MODEL: ${{ secrets.GOOGLE_FORM_MAPPING_DEVICE_MODEL }}
+          GOOGLE_FORM_MAPPING_MESSAGE: ${{ secrets.GOOGLE_FORM_MAPPING_MESSAGE }}
+          GOOGLE_FORM_MAPPING_APP_VERSION: ${{ secrets.GOOGLE_FORM_MAPPING_APP_VERSION }}
+          TEST_SLACK_WEBHOOK_URL_PATH: ${{ secrets.TEST_SLACK_WEBHOOK_URL_PATH }}
+          TEST_GOOGLE_FORM_KEY: ${{ secrets.TEST_GOOGLE_FORM_KEY }}
+          TEST_GOOGLE_FORM_MAPPING_TIMESTAMP: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_TIMESTAMP }}
+          TEST_GOOGLE_FORM_MAPPING_TOPIC: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_TOPIC }}
+          TEST_GOOGLE_FORM_MAPPING_APP: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_APP }}
+          TEST_GOOGLE_FORM_MAPPING_OPERATING_SYSTEM: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_OPERATING_SYSTEM }}
+          TEST_GOOGLE_FORM_MAPPING_DEVICE_MODEL: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_DEVICE_MODEL }}
+          TEST_GOOGLE_FORM_MAPPING_MESSAGE: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_MESSAGE }}
+          TEST_GOOGLE_FORM_MAPPING_APP_VERSION: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_APP_VERSION }}
+          IOS_APP_GROUP_ID: ${{ secrets.IOS_APP_GROUP_ID }}
+          
+        run: |
+          mkdir -p ios/certs
+          echo $APPLE_PROVISIONING_PROFILE | base64 -d > ios/certs/profile.mobileprovision
+          echo $APPLE_PROVISIONING_PROFILE_AUTOFILL | base64 -d > ios/certs/profile-autofill.mobileprovision
+          echo $APPLE_DISTRIBUTION_CERTIFICATE | base64 -d > ios/certs/dist-cert.p12
+          echo $CREDENTIALS_JSON | base64 -d > credentials.json
+          # CHANGED: add branch-aware profile
+          eas build --platform ios --profile ${{ steps.branch_profile.outputs.PROFILE }} --local --non-interactive
+
+      - name: Find IPA file
+        id: find_ipa
+        run: |
+          IPA_PATH=$(find $GITHUB_WORKSPACE -name "*.ipa" -type f | head -n 1)
+          echo "IPA_PATH=$IPA_PATH" >> $GITHUB_OUTPUT
+          echo "Found IPA at: $IPA_PATH"
+
+          # Extract version from app.json (kept for logging)
+          VERSION=$(jq -r '.expo.version' app.json)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "App version: $VERSION"
+
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_OUTPUT
+
+      # NEW: upload iOS artifact for unified release
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PearPass-Mobile-iOS-v${{ steps.find_ipa.outputs.VERSION }}
+          path: ${{ steps.find_ipa.outputs.IPA_PATH }}
+          if-no-files-found: error
+
+      # CHANGED: Submit to App Store only on main
+      - name: Submit to Apple App Store via EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          APPLE_APIKEY: ${{ secrets.APPLE_APIKEY }}
+          EXPO_ASC_API_KEY_PATH: "${{ env.GITHUB_WORKSPACE }}/apple-asc-api-key.p8"
+          EXPO_ASC_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          EXPO_ASC_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          EXPO_APPLE_TEAM_ID: "43QFHSJ5QR"
+          EXPO_APPLE_TEAM_TYPE: "COMPANY_OR_ORGANIZATION"
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+          APPLE_DISTRIBUTION_CERTIFICATE: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE }}
+          SLACK_WEBHOOK_URL_PATH: ${{ secrets.SLACK_WEBHOOK_URL_PATH }}
+          GOOGLE_FORM_KEY: ${{ secrets.GOOGLE_FORM_KEY }}
+          GOOGLE_FORM_MAPPING_TIMESTAMP: ${{ secrets.GOOGLE_FORM_MAPPING_TIMESTAMP }}
+          GOOGLE_FORM_MAPPING_TOPIC: ${{ secrets.GOOGLE_FORM_MAPPING_TOPIC }}
+          GOOGLE_FORM_MAPPING_APP: ${{ secrets.GOOGLE_FORM_MAPPING_APP }}
+          GOOGLE_FORM_MAPPING_OPERATING_SYSTEM: ${{ secrets.GOOGLE_FORM_MAPPING_OPERATING_SYSTEM }}
+          GOOGLE_FORM_MAPPING_DEVICE_MODEL: ${{ secrets.GOOGLE_FORM_MAPPING_DEVICE_MODEL }}
+          GOOGLE_FORM_MAPPING_MESSAGE: ${{ secrets.GOOGLE_FORM_MAPPING_MESSAGE }}
+          GOOGLE_FORM_MAPPING_APP_VERSION: ${{ secrets.GOOGLE_FORM_MAPPING_APP_VERSION }}
+          TEST_SLACK_WEBHOOK_URL_PATH: ${{ secrets.TEST_SLACK_WEBHOOK_URL_PATH }}
+          TEST_GOOGLE_FORM_KEY: ${{ secrets.TEST_GOOGLE_FORM_KEY }}
+          TEST_GOOGLE_FORM_MAPPING_TIMESTAMP: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_TIMESTAMP }}
+          TEST_GOOGLE_FORM_MAPPING_TOPIC: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_TOPIC }}
+          TEST_GOOGLE_FORM_MAPPING_APP: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_APP }}
+          TEST_GOOGLE_FORM_MAPPING_OPERATING_SYSTEM: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_OPERATING_SYSTEM }}
+          TEST_GOOGLE_FORM_MAPPING_DEVICE_MODEL: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_DEVICE_MODEL }}
+          TEST_GOOGLE_FORM_MAPPING_MESSAGE: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_MESSAGE }}
+          TEST_GOOGLE_FORM_MAPPING_APP_VERSION: ${{ secrets.TEST_GOOGLE_FORM_MAPPING_APP_VERSION }}
+          IOS_APP_GROUP_ID: ${{ secrets.IOS_APP_GROUP_ID }}
+        run: |
+          echo $APPLE_APIKEY | base64 -d > apple-asc-api-key.p8
+          eas submit -p ios --path ${{ steps.find_ipa.outputs.IPA_PATH }} --non-interactive
+
+  mobile_release:
+    name: Create unified Mobile release (IPA)
+    runs-on: ubuntu-latest
+    needs: [android, ios]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: PearPass-Mobile-Android-v${{ needs.android.outputs.version }}
+          path: ./dist
+        continue-on-error: false
+
+      - name: Download iOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: PearPass-Mobile-iOS-v${{ needs.android.outputs.version }}
+          path: ./dist
+        continue-on-error: false
+
+      - name: Inspect collected artifacts
+        run: |
+          ls -la ./dist || true
+
+      - name: Create GitHub Release (PearPass-Mobile-vX.Y.Z)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.android.outputs.version }}
+          name: PearPass-Mobile-v${{ needs.android.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            dist/**/*.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          

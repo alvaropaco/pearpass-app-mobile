@@ -1,0 +1,11 @@
+appId: com.pears.pass
+---
+- runFlow: passwordEnter.yaml
+- assertVisible: "Create a new vault"
+- tapOn: "Create a new vault"
+- assertVisible: "Enter Name"
+- tapOn: "Enter Name"
+- inputText: "My Vault"
+- tapOn: "Continue"
+- assertVisible: "This collection is empty."
+

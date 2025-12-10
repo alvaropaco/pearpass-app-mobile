@@ -1,0 +1,91 @@
+{
+  "expo": {
+    "name": "PearPass",
+    "slug": "pearpass",
+    "icon": "./assets/images/appIcons/app-icon.png",
+    "version": "1.0.0",
+    "android": {
+      "package": "com.pears.pass",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/appIcons/adaptive-icon.png",
+        "backgroundColor": "#232323"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.pears.pass",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "This app requires access to your photo library to allow you to select and upload photos.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "supportsTablet": false,
+      "runtimeVersion": {
+        "policy": "sdkVersion"
+      },
+      "usesNonExemptEncryption": false,
+      "scheme": "pearpassappmobile",
+      "appleTeamId": "43QFHSJ5QR"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#232323",
+          "image": "./assets/images/splash/splash-icon.png",
+          "imageWidth": 150,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan QR codes for securely pairing your account with another device."
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "assets/fonts/humble-nostalgia.otf",
+            "assets/fonts/inter.ttf"
+          ]
+        }
+      ],
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 29,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35
+          }
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID or Touch ID to quickly and securely unlock your vault without entering your master password."
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID or Touch ID to quickly and securely unlock your vault without entering your master password."
+        }
+      ],
+      "expo-video"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "28facb62-e2a2-4b6c-bc3f-0f5469e79415"
+      }
+    }
+  }
+}

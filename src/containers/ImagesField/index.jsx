@@ -1,0 +1,141 @@
+import { useMemo, useCallback, memo } from 'react'
+
+import { useLingui } from '@lingui/react/macro'
+import { useNavigation } from '@react-navigation/native'
+import { Camera } from 'expo-camera'
+import { ImageIcon, PlusIcon } from 'pearpass-lib-ui-react-native-components'
+import { colors } from 'pearpass-lib-ui-theme-provider'
+import { Alert, Pressable, Linking } from 'react-native'
+
+import { useBottomSheet } from '../../context/BottomSheetContext'
+import { logger } from '../../utils/logger'
+import { BottomSheetUploadImageContent } from '../BottomSheetUploadImageContent'
+import {
+  AddContainer,
+  Body,
+  Container,
+  Header,
+  ImageContainer,
+  Photo,
+  Title
+} from './styles'
+import { useAutoLockContext } from '../../context/AutoLockContext'
+
+/**
+ * @component
+ * @param {Object} props
+ * @param {string} props.title
+ * @param {Array<Object>} [props.pictures=[]]
+ * @param {function} [props.onAdd]
+ * @param {function} [props.onRemove]
+ */
+const ImagesFieldComponent = ({ title, pictures = [], onAdd, onRemove }) => {
+  const { expand } = useBottomSheet()
+  const navigation = useNavigation()
+  const { t } = useLingui()
+  const { setShouldBypassAutoLock } = useAutoLockContext()
+
+  // Memoize URIs to avoid recreating them on every render
+  const picturesWithUris = useMemo(
+    () =>
+      pictures?.map((picture, index) => ({
+        ...picture,
+        uri: picture.base64
+          ? `data:image/jpeg;base64,${picture.base64}`
+          : undefined,
+        // Use a stable key: id if available, otherwise name, fallback to index
+        key: picture.id || picture.name || `picture-${index}`
+      })) || [],
+    [pictures]
+  )
+
+  const handlePictureClick = useCallback(
+    (uri, name, index) => {
+      navigation.navigate('ImagePreview', {
+        imageUri: uri,
+        imageName: name,
+        onDelete: onRemove ? () => onRemove(index) : undefined
+      })
+    },
+    [navigation, onRemove]
+  )
+
+  const handleAddClick = useCallback(async () => {
+    try {
+      setShouldBypassAutoLock(true)
+      const cameraPermission = await Camera.getCameraPermissionsAsync()
+
+      let cameraGranted = cameraPermission.status === 'granted'
+
+      if (!cameraGranted && cameraPermission.canAskAgain) {
+        const result = await Camera.requestCameraPermissionsAsync()
+        cameraGranted = result.status === 'granted'
+      }
+
+      if (!cameraGranted && !cameraPermission.canAskAgain) {
+        Alert.alert(
+          t`Permission Required`,
+          t`Camera access is required to take photos. Please enable it in Settings.`,
+          [
+            { text: t`Cancel`, style: 'cancel' },
+            {
+              text: t`Open Settings`,
+              onPress: () => Linking.openSettings()
+            }
+          ]
+        )
+        return
+      }
+
+      if (!cameraGranted) {
+        Alert.alert(
+          t`Permission Required`,
+          t`Camera access is required to take photos.`,
+          [{ text: t`OK` }]
+        )
+        return
+      }
+      expand({
+        children: <BottomSheetUploadImageContent onFileSelect={onAdd} />,
+        snapPoints: ['65%', '65%', '80%']
+      })
+    } catch (error) {
+      logger.error('Error checking permissions:', error)
+      Alert.alert(t`Error`, t`Failed to check permissions. Please try again.`)
+    } finally {
+      setShouldBypassAutoLock(false)
+    }
+  }, [expand, onAdd, t])
+
+  return (
+    <Container>
+      <Header>
+        <ImageIcon />
+        <Title>{title}</Title>
+      </Header>
+
+      <Body>
+        {picturesWithUris.map((picture, idx) => (
+          <Pressable
+            key={`picture.key-${idx}`}
+            onPress={() => handlePictureClick(picture.uri, picture.name, idx)}
+          >
+            <ImageContainer>
+              <Photo source={{ uri: picture.uri }} resizeMode="cover" />
+            </ImageContainer>
+          </Pressable>
+        ))}
+
+        {onAdd && (
+          <AddContainer onPress={handleAddClick}>
+            <PlusIcon color={colors.primary400.mode1} />
+          </AddContainer>
+        )}
+      </Body>
+    </Container>
+  )
+}
+
+ImagesFieldComponent.displayName = 'ImagesField'
+
+export const ImagesField = memo(ImagesFieldComponent)

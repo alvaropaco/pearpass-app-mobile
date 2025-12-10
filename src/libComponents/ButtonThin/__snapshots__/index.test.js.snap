@@ -1,0 +1,72 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ButtonThin Component matches snapshot 1`] = `
+<View
+  accessibilityState={
+    {
+      "busy": undefined,
+      "checked": undefined,
+      "disabled": undefined,
+      "expanded": undefined,
+      "selected": undefined,
+    }
+  }
+  accessibilityValue={
+    {
+      "max": undefined,
+      "min": undefined,
+      "now": undefined,
+      "text": undefined,
+    }
+  }
+  accessible={true}
+  collapsable={false}
+  focusable={true}
+  onClick={[Function]}
+  onResponderGrant={[Function]}
+  onResponderMove={[Function]}
+  onResponderRelease={[Function]}
+  onResponderTerminate={[Function]}
+  onResponderTerminationRequest={[Function]}
+  onStartShouldSetResponder={[Function]}
+  style={
+    {
+      "alignItems": "center",
+      "alignSelf": "flex-start",
+      "backgroundColor": "#050B06",
+      "borderBottomLeftRadius": 20,
+      "borderBottomRightRadius": 20,
+      "borderColor": "#050B06",
+      "borderTopLeftRadius": 20,
+      "borderTopRightRadius": 20,
+      "borderWidth": 1,
+      "flexDirection": "row",
+      "gap": 10,
+      "justifyContent": "center",
+      "opacity": 1,
+      "paddingBottom": 10,
+      "paddingLeft": 15,
+      "paddingRight": 15,
+      "paddingTop": 10,
+    }
+  }
+>
+  <Text
+    testID="dummy-icon"
+  >
+    Icon 21 #BADE5B
+  </Text>
+  <Text
+    style={
+      {
+        "color": "#BADE5B",
+        "fontFamily": "Inter",
+        "fontSize": 16,
+        "fontWeight": "400",
+      }
+    }
+  >
+    Thin Button
+  </Text>
+</View>
+`;
