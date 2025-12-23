@@ -28,7 +28,7 @@
     "custom-prebuild:android": "node scripts/custom-expo-prebuild.cjs android",
     "update-submodules": "bash scripts/update-submodules.sh",
     "eas-build-pre-install": "node -v && npm -v && npm install --package-lock-only --ignore-scripts --no-audit --no-fund",
-    "eas-build-post-install": "npm run bundle-bare"
+    "eas-build-post-install": "npm run bundle-bare && npm run lingui:extract && npm run lingui:compile"
   },
   "dependencies": {
     "@expo/metro-runtime": "~5.0.4",
