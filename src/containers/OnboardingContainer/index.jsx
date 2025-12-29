@@ -151,24 +151,28 @@ export const OnboardingContainer = ({
         )
       case 2:
         return (
-          <View testID="onboarding-media-step-2">
-            <Rive resourceName="password" style={styles.riveAnimation} />
-          </View>
-        )
-
+          <Rive
+            resourceName="password"
+            style={styles.riveAnimation}
+            testID="onboarding-media-step-2"
+          />
+        );
       case 3:
         return (
-          <View testID="onboarding-media-step-3">
-            <Rive resourceName="category" style={styles.riveAnimation} />
-          </View>
-        )
-
+          <Rive
+            resourceName="category"
+            style={styles.riveAnimation}
+            testID="onboarding-media-step-3"
+          />
+        );
       case 4:
         return (
-          <View testID="onboarding-media-step-4">
-            <Rive resourceName="form" style={styles.riveAnimationForm} />
-          </View>
-        )
+          <Rive
+            resourceName="form"
+            style={styles.riveAnimationForm}
+            testID="onboarding-media-step-4"
+          />
+        );
       case 5:
         return (
           <Image
