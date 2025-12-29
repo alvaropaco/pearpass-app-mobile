@@ -226,24 +226,22 @@ export const CreatePassword = () => {
               testID="create-password-description"
             >{t`The first thing to do is create a Master password to secure your account.  You'll use this password to access PearPass. `}</Text>
             <View style={styles.inputContainer}>
-              <View testID="create-password-input">
                 <InputPasswordPearPass
                   placeholder={t`Enter Password`}
                   {...passwordRegisterProps}
                   onChange={handlePasswordChange}
                   isPassword
+                  testID="create-password-input"
                   errorTestID="create-password-input-error"
                 />
-              </View>
 
-              <View testID="create-password-confirm-input">
                 <InputPasswordPearPass
                   placeholder={t`Confirm Password`}
                   {...register('passwordConfirm')}
                   isPassword
+                  "create-password-confirm-input"
                   errorTestID="create-password-confirm-input-error"
                 />
-              </View>
             </View>
 
             <View style={styles.requirementsContainer} testID="create-password-requirements-container">
@@ -272,6 +270,7 @@ export const CreatePassword = () => {
             <View style={styles.termsContainer}>
               <View testID="create-password-warning">
                 <AppWarning
+                  testID "create-password-warning-text"
                   warning={t`Don't forget your master password. It's the only way to access your vault. We can't help recover it. Back it up securely.`}
                   textStyles={{ flex: 0 }}
                 />
@@ -307,15 +306,14 @@ export const CreatePassword = () => {
                   testID="create-password-loading"
                 />
               ) : (
-                <View testID="create-password-continue-button">
                   <ButtonPrimary
+                    testID="create-password-continue-button"
                     stretch
                     onPress={handleSubmit(onSubmit)}
                     disabled={!accepted}
                   >
                     {t`Continue`}
                   </ButtonPrimary>
-                </View>
               )}
             </View>
           </View>
