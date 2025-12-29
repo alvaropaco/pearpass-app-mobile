@@ -124,12 +124,11 @@ export const NewVault = () => {
             </View>
 
             <View style={styles.inputs}>
-              <View testID="new-vault-name-input">
                 <InputPasswordPearPass
+                  testID="new-vault-name-input"
                   placeholder={t`Enter Name`}
                   {...register('name')}
                 />
-              </View>
             </View>
             {PROTECTED_VAULT_ENABLED && (
               <View style={styles.inputs}>
@@ -190,13 +189,13 @@ export const NewVault = () => {
                 />
               ) : (
                 <>
-                  <View testID="new-vault-continue-button">
-                    <ButtonPrimary stretch onPress={handleSubmit(onSubmit)}>
+                    <ButtonPrimary 
+                      testID="new-vault-continue-button"
+                      stretch onPress={handleSubmit(onSubmit)}>
                       {t`Continue`}
                     </ButtonPrimary>
-                  </View>
-                  <View testID="new-vault-select-vaults-button">
                     <ButtonSecondary
+                      testID="new-vault-select-vaults-button"
                       stretch
                       onPress={() =>
                         navigation.navigate('Welcome', { state: 'selectOrLoad' })
@@ -204,7 +203,6 @@ export const NewVault = () => {
                     >
                       {t`Select Vaults`}
                     </ButtonSecondary>
-                  </View>
                 </>
               )}
             </View>
