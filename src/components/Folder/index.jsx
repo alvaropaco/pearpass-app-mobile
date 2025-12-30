@@ -4,7 +4,6 @@ import {
   KebabMenuIcon
 } from 'pearpass-lib-ui-react-native-components'
 import { colors } from 'pearpass-lib-ui-theme-provider/native'
-import { View } from 'react-native'
 
 import {
   FolderContainer,
@@ -41,8 +40,8 @@ export const Folder = ({
   const handlePress = () => {
     collapse()
 
+    if (folder.isCreateNew) {
       onCreateNewFolder()
-
       return
     }
 
@@ -56,11 +55,17 @@ export const Folder = ({
     return undefined
   }
 
-    if (folder.isCreateNew) {
   const getCountTestID = () => {
     if (folder.id === 'allFolder') return 'sidebar-all-folders-count'
     if (folder.id === 'favorite') return 'sidebar-favorites-count'
     return undefined
+  }
+
+  const getActiveCheckTestID = () => {
+    if (folder.id === 'allFolder') return 'sidebar-all-folders-active'
+    if (folder.id === 'favorite') return 'sidebar-favorites-active'
+    if (folder.isCreateNew) return 'sidebar-create-new-active'
+    return `sidebar-folder-${folder.id}-active`
   }
 
   return (
