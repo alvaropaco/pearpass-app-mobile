@@ -20,7 +20,7 @@ class ClearClipboardWorker(
 ) : Worker(appContext, workerParams) {
 
     companion object {
-        const val TAG = "ClearClipboardWorker"man
+        const val TAG = "ClearClipboardWorker"
     }
 
     private val clipboardManager =
