@@ -49,6 +49,10 @@ export const useAutoLock = () => {
           navigation.navigate('Welcome', { state: 'enterMasterPassword' })
           resetState()
         }
+
+        if (previousAppState.match(/background/) && nextAppState === 'active') {
+          await refetchUser()
+        }
       }
     )
 
