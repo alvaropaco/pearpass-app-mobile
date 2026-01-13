@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN }}
 
-      - name: Setup Node.js
+      - name: Setup Node.js (and registry)
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -38,23 +38,27 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install system dependencies
+      - name: Install system deps & accept Android licenses
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
-          yes | sdkmanager --licenses
+          # Accept android sdk licenses if sdkmanager is available
+          if command -v sdkmanager >/dev/null 2>&1; then
+            yes | sdkmanager --licenses || true
+          fi
 
       - name: Configure Git authentication
         run: |
+          # Force HTTPS remotes to use PAT for non-interactive git operations
           git config --global url."https://${{ secrets.PAT_TOKEN }}@github.com/".insteadOf "https://github.com/"
           git config --global url."https://${{ secrets.PAT_TOKEN }}@github.com/".insteadOf "git@github.com:"
 
-      - name: Install dependencies
+      - name: Install Node dependencies
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: npm ci --legacy-peer-deps
 
-      - name: Generate Android worklet bundle
+      - name: Generate worklet bundle for Android
         run: npm run bundle:android
 
       - name: Install EAS CLI
@@ -62,55 +66,285 @@ jobs:
 
       - name: Write Google Play service account key
         run: |
-          printf '%s' '${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}' > google-service-account.json
+          # Use printf to preserve newlines exactly for JSON secrets
+          printf '%s' "${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}" > google-service-account.json
 
-      - name: Resolve EAS profile
-        id: profile
+      - name: Resolve EAS profile by branch
+        id: branch_profile
         run: |
-          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            echo "PROFILE=production" >> $GITHUB_OUTPUT
+          if [ "${GITHUB_REF##*/}" = "main" ]; then
+            PROFILE=production
           else
-            echo "PROFILE=preview" >> $GITHUB_OUTPUT
+            PROFILE=preview
           fi
+          echo "PROFILE=$PROFILE" >> "$GITHUB_OUTPUT"
 
-      - name: Read and validate Expo version
+      - name: Read version & enforce semantic versioning
         id: meta
         run: |
           set -euo pipefail
           VERSION=$(jq -r '.expo.version' app.json)
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: expo.version ($VERSION) must be MAJOR.MINOR.PATCH." >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Prebuild Android
+      - name: Add -dev suffix to expo.version for dev branch (Android)
+        if: github.ref == 'refs/heads/dev'
+        run: |
+          # NOTE: Do not change the pipeline output VERSION — only mutate the app.json used by the Android build metadata if required.
+          BASE_VERSION="${{ steps.meta.outputs.VERSION }}"
+          DEV_VERSION="${BASE_VERSION%-dev}-dev"
+          tmp=$(mktemp)
+          jq --arg v "$DEV_VERSION" '.expo.version = $v' app.json > "$tmp"
+          mv "$tmp" app.json
+          echo "expo.version updated to: $DEV_VERSION (Android dev build)"
+
+      - name: Run custom expo prebuild
         run: npm run custom-prebuild:android
 
       - name: EAS build (Android local)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_GOOGLE_SERVICE_ACCOUNT_KEY_PATH: ${{ github.workspace }}/google-service-account.json
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+          GOOGLE_PLAY_KEYSTORE: ${{ secrets.GOOGLE_PLAY_KEYSTORE }}
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
-          eas build \
-            --platform android \
-            --profile ${{ steps.profile.outputs.PROFILE }} \
-            --local \
-            --non-interactive
+          mkdir -p android/keystores || true
+          # Decode keystore and credentials if provided (EAS will pick them up)
+          if [ -n "${GOOGLE_PLAY_KEYSTORE:-}" ]; then
+            echo "$GOOGLE_PLAY_KEYSTORE" | base64 -d > android/keystores/release.keystore
+          fi
+          if [ -n "${CREDENTIALS_JSON:-}" ]; then
+            echo "$CREDENTIALS_JSON" | base64 -d > credentials.json
+          fi
+          eas build --platform android --profile ${{ steps.branch_profile.outputs.PROFILE }} --local --non-interactive
 
-      - name: Collect Android artifact
-        id: artifact
+      - name: Build APK for GitHub release (only when production profile)
+        if: steps.branch_profile.outputs.PROFILE == 'production'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          # Produce an APK too if you want to attach to releases (use preview profile if desired)
+          eas build --platform android --profile production --local --non-interactive || true
+
+      - name: Find and rename Android artifact
+        id: find_android
         run: |
           set -euo pipefail
-          AAB=$(find . \
-            \( -path "./.expo*" -o -path "./android*" \) \
-            -name "*.aab" | head -n 1)
+          # Search common EAS/Gradle output locations for .aab or .apk (prefer AAB)
+          AAB_PATH=$(find . -type f -name "*.aab" -not -path "./node_modules/*" | head -n 1 || true)
+          APK_PATH=$(find . -type f -name "*.apk" -not -path "./node_modules/*" | head -n 1 || true)
 
-          [[ -n "$AAB" ]]
-          OUT="PearPass-Mobile-Android-v${{ steps.meta.outputs.VERSION }}.aab"
-          mv "$AAB" "$OUT"
-          echo "AAB_PATH=$OUT" >> $GITHUB_OUTPUT
+          if [ -n "$AAB_PATH" ]; then
+            OUT_PATH="$GITHUB_WORKSPACE/PearPass-Mobile-Android-v${{ steps.meta.outputs.VERSION }}.aab"
+            mv "$AAB_PATH" "$OUT_PATH"
+            echo "AAB_PATH=$OUT_PATH" >> "$GITHUB_OUTPUT"
+            echo "ARTIFACT_TYPE=aab" >> "$GITHUB_OUTPUT"
+          elif [ -n "$APK_PATH" ]; then
+            OUT_PATH="$GITHUB_WORKSPACE/PearPass-Mobile-Android-v${{ steps.meta.outputs.VERSION }}.apk"
+            mv "$APK_PATH" "$OUT_PATH"
+            echo "AAB_PATH=$OUT_PATH" >> "$GITHUB_OUTPUT"
+            echo "ARTIFACT_TYPE=apk" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Android artifact found."
+            echo "AAB_PATH=" >> "$GITHUB_OUTPUT"
+            echo "ARTIFACT_TYPE=" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Upload Android artifact
+          VERSION_CODE=$(jq -r '.expo.android.versionCode' app.json || echo "")
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "TIMESTAMP=$TIMESTAMP" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: PearPass-Mobile-Android-v${{ steps.meta.outputs.VERSION }}.aab
-          path: ${{ steps.artifact.outputs.AAB_PATH }}
+          name: PearPass-Mobile-Android-v${{ steps.meta.outputs.VERSION }}
+          path: ${{ steps.find_android.outputs.AAB_PATH }}
+          if-no-files-found: ignore
+
+      - name: Submit to Google Play via EAS (if artifact present)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_GOOGLE_SERVICE_ACCOUNT_KEY_PATH: ${{ github.workspace }}/google-service-account.json
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+          GOOGLE_PLAY_KEYSTORE: ${{ secrets.GOOGLE_PLAY_KEYSTORE }}
+        run: |
+          if [ -n "${{ steps.find_android.outputs.AAB_PATH }}" ]; then
+            eas submit -p android --path "${{ steps.find_android.outputs.AAB_PATH }}" --non-interactive || true
+          else
+            echo "No AAB/APK found; skipping Android submit."
+          fi
+
+  ios:
+    runs-on: macos-latest
+    outputs:
+      ios_version: ${{ steps.find_ipa.outputs.VERSION || '' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Select Xcode (use default or adjust if you need specific version)
+        run: |
+          # No-op if default Xcode is fine. If you require a specific Xcode, replace the path below.
+          sudo xcode-select -s /Applications/Xcode.app || true
+
+      - name: Setup Node.js (and registry)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@tetherto"
+          cache: npm
+
+      - name: Configure Git authentication
+        run: |
+          git config --global url."https://${{ secrets.PAT_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://${{ secrets.PAT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+
+      - name: Install Apple WWDR certificate (unlock keychain and install)
+        run: |
+          # Unlock login keychain to install cert
+          security unlock-keychain -p "" ~/Library/Keychains/login.keychain-db || true
+          curl -O https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer
+          sudo security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db AppleWWDRCAG3.cer || true
+
+      - name: Install Node dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: npm ci --legacy-peer-deps
+
+      - name: Generate worklet bundle for iOS
+        run: npm run bundle:ios
+
+      - name: Generate worklet bundle for iOS extension
+        run: npm run bundle:ios-extension
+
+      - name: Extract translations
+        run: |
+          npm run lingui:extract
+          npm run lingui:compile
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Resolve EAS profile by branch
+        id: branch_profile_ios
+        run: |
+          if [ "${GITHUB_REF##*/}" = "main" ]; then
+            PROFILE=production
+          else
+            PROFILE=preview
+          fi
+          echo "PROFILE=$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Run custom expo prebuild
+        run: npm run custom-prebuild:ios
+
+      - name: Prepare Apple credentials
+        run: |
+          mkdir -p ios/certs
+          printf '%s' "${{ secrets.APPLE_PROVISIONING_PROFILE }}" | base64 -d > ios/certs/profile.mobileprovision || true
+          printf '%s' "${{ secrets.APPLE_PROVISIONING_PROFILE_AUTOFILL }}" | base64 -d > ios/certs/profile-autofill.mobileprovision || true
+          printf '%s' "${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE }}" | base64 -d > ios/certs/dist-cert.p12 || true
+          printf '%s' "${{ secrets.CREDENTIALS_JSON }}" | base64 -d > credentials.json || true
+          printf '%s' "${{ secrets.APPLE_APIKEY }}" | base64 -d > apple-asc-api-key.p8 || true
+
+      - name: EAS build (iOS local)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas build --platform ios --profile ${{ steps.branch_profile_ios.outputs.PROFILE }} --local --non-interactive || true
+
+      - name: Find and rename IPA file
+        id: find_ipa
+        run: |
+          set -euo pipefail
+          IPA_PATH=$(find . -type f -name "*.ipa" -not -path "./node_modules/*" | head -n 1 || true)
+          echo "Original IPA: $IPA_PATH"
+          if [ -n "$IPA_PATH" ]; then
+            VERSION=$(jq -r '.expo.version' app.json || echo "0.0.0")
+            NEW_NAME="PearPass-Mobile-iOS-v${VERSION}.ipa"
+            NEW_PATH="$GITHUB_WORKSPACE/$NEW_NAME"
+            mv "$IPA_PATH" "$NEW_PATH"
+            echo "Renamed IPA to: $NEW_PATH"
+            echo "IPA_PATH=$NEW_PATH" >> "$GITHUB_OUTPUT"
+            echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "No .ipa file found."
+            echo "IPA_PATH=" >> "$GITHUB_OUTPUT"
+            echo "VERSION=" >> "$GITHUB_OUTPUT"
+          fi
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          echo "TIMESTAMP=$TIMESTAMP" >> "$GITHUB_OUTPUT"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PearPass-Mobile-iOS-v${{ steps.find_ipa.outputs.VERSION }}
+          path: ${{ steps.find_ipa.outputs.IPA_PATH }}
+          if-no-files-found: ignore
+
+      - name: Submit to Apple App Store via EAS (main only)
+        if: github.ref == 'refs/heads/main'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_ASC_API_KEY_PATH: ${{ github.workspace }}/apple-asc-api-key.p8
+          EXPO_ASC_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          EXPO_ASC_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          EXPO_APPLE_TEAM_ID: "43QFHSJ5QR"
+          EXPO_APPLE_TEAM_TYPE: "COMPANY_OR_ORGANIZATION"
+        run: |
+          if [ -n "${{ steps.find_ipa.outputs.IPA_PATH }}" ]; then
+            eas submit -p ios --path "${{ steps.find_ipa.outputs.IPA_PATH }}" --non-interactive || true
+          else
+            echo "No IPA found; skipping iOS submit."
+          fi
+
+  mobile_release:
+    name: Create unified Mobile release (IPA & AAB)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs: [android, ios]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PearPass-Mobile-Android-v${{ needs.android.outputs.version }}
+          path: ./dist
+        continue-on-error: false
+
+      - name: Download iOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PearPass-Mobile-iOS-v${{ needs.ios.outputs.VERSION }}
+          path: ./dist
+        continue-on-error: false
+
+      - name: Inspect collected artifacts
+        run: |
+          ls -la ./dist || true
+
+      - name: Create GitHub Release (PearPass-Mobile-vX.Y.Z)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.android.outputs.version }}
+          name: PearPass-Mobile-v${{ needs.android.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            dist/**/*.ipa
+            dist/**/*.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
