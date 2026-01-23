@@ -7,7 +7,6 @@ on:
       - dev
       - staging
 
-
 jobs:
   android:
     runs-on: ubuntu-24.04
@@ -70,8 +69,8 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
-      - name: Generate worklet bundle for Android
-        run: npm run bundle:android
+      - name: Generate worklet bundle and translations
+        run: npm run build
 
       - name: Install EAS CLI
         run: npm install --global eas-cli
@@ -272,16 +271,8 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
-      - name: Generate worklet bundle for iOS
-        run: npm run bundle:ios
-  
-      - name: Generate worklet bundle for iOS extension
-        run: npm run bundle:ios-extension
-
-      - name: Extract translations
-        run: |
-          npm run lingui:extract
-          npm run lingui:compile
+      - name: Generate worklet bundle and translations
+        run: npm run build
 
       - name: Install EAS CLI
         run: npm install --global eas-cli
