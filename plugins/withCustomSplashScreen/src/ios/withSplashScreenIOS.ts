@@ -1,4 +1,4 @@
-import { ConfigPlugin, withDangerousMod, withMod } from '@expo/config-plugins';
+import { ConfigPlugin, withDangerousMod } from '@expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -18,34 +18,36 @@ async function copyDirectory(src: string, dest: string): Promise<void> {
   }
 }
 
-// Intercept Expo's splash storyboard mod - set skipWriting flag and copy our file instead
+// Copy custom splash storyboard (overwrites Expo's default after it's created)
 const withCustomSplashStoryboard: ConfigPlugin = (config) => {
-  return withMod(config, {
-    platform: 'ios',
-    mod: 'splashScreenStoryboard',
-    action: async (cfg) => {
-      const templateDir = path.join(__dirname, '../../templates/ios');
-      const storyboardSrc = path.join(templateDir, 'SplashScreen.storyboard');
-      const projectName = cfg.modRequest.projectName || cfg.name || 'PearPass';
-      const storyboardDest = path.join(cfg.modRequest.platformProjectRoot, projectName, 'SplashScreen.storyboard');
-
-      // Copy our storyboard directly
-      if (fs.existsSync(storyboardSrc)) {
-        await fs.promises.copyFile(storyboardSrc, storyboardDest);
-      }
-
-      // Tell Expo's base mod to skip writing by marking it handled
-      cfg.modResults = null as any;
-      (cfg.modRequest as any).introspect = true;
-
+  return withDangerousMod(config, ['ios', async (cfg) => {
+    // Skip file operations during introspection (config reading)
+    if ((cfg.modRequest as any).introspect) {
       return cfg;
-    },
-  });
+    }
+
+    const templateDir = path.join(__dirname, '../../templates/ios');
+    const storyboardSrc = path.join(templateDir, 'SplashScreen.storyboard');
+    const projectName = cfg.modRequest.projectName || cfg.name || 'PearPass';
+    const storyboardDest = path.join(cfg.modRequest.platformProjectRoot, projectName, 'SplashScreen.storyboard');
+
+    // Copy our storyboard (overwrites the default one created by Expo)
+    if (fs.existsSync(storyboardSrc)) {
+      await fs.promises.copyFile(storyboardSrc, storyboardDest);
+    }
+
+    return cfg;
+  }]);
 };
 
 // Copy splash screen assets (images, colorsets)
 const withSplashScreenAssets: ConfigPlugin = (config) => {
   return withDangerousMod(config, ['ios', async (cfg) => {
+    // Skip file operations during introspection (config reading)
+    if ((cfg.modRequest as any).introspect) {
+      return cfg;
+    }
+
     const templateDir = path.join(__dirname, '../../templates/ios');
     const iosDir = cfg.modRequest.platformProjectRoot;
     const projectName = cfg.modRequest.projectName || cfg.name || 'PearPass';
