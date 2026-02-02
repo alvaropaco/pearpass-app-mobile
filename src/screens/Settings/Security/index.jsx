@@ -1,39 +1,46 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { useLingui } from '@lingui/react/macro'
+import { useNavigation } from '@react-navigation/native'
 import * as SecureStore from 'expo-secure-store'
 import { AUTO_LOCK_ENABLED } from 'pearpass-lib-constants'
+import { BackIcon } from 'pearpass-lib-ui-react-native-components'
+import { colors } from 'pearpass-lib-ui-theme-provider/native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { Container, Description } from './styles'
 import { CardSingleSetting } from '../../../components/CardSingleSetting'
+import { ListItem } from '../../../components/ListItem'
 import { IOS_APP_GROUP_ID } from '../../../constants/iosAppGroup'
 import { SECURE_STORAGE_KEYS } from '../../../constants/secureStorageKeys'
 import { AutoLockSettings } from '../../../containers/AutoLockSettings'
 import { RuleSelector } from '../../../containers/BottomSheetPassGeneratorContent/RuleSelector'
-import { useHapticsContext } from '../../../context/HapticsContext'
+import { ModifyMasterVaultModalContent } from '../../../containers/Modal/ModifyMasterVaultModalContent'
+import { useModal } from '../../../context/ModalContext'
 import { useBiometricsAuthentication } from '../../../hooks/useBiometricsAuthentication'
 import { usePasswordChangeReminder } from '../../../hooks/usePasswordChangeReminder'
+import { ButtonLittle } from '../../../libComponents'
 
-export const PrivacySection = () => {
+export const Security = () => {
   const { t } = useLingui()
+  const navigation = useNavigation()
+  const { openModal } = useModal()
   const { isPasswordChangeReminderEnabled } = usePasswordChangeReminder()
-  const { isHapticsEnabled, setIsHapticsEnabled } = useHapticsContext()
+  const { isBiometricsSupported, isBiometricsEnabled, toggleBiometrics } =
+    useBiometricsAuthentication()
+
   const [selectedRules, setSelectedRules] = useState({
     biometrics: false,
     copyToClipboard: true,
-    passwordChangeReminder: true,
-    haptics: true
+    passwordChangeReminder: true
   })
-
-  const { isBiometricsSupported, isBiometricsEnabled, toggleBiometrics } =
-    useBiometricsAuthentication()
 
   const ruleOptions = useMemo(() => {
     const options = [
       {
         name: 'passwordChangeReminder',
         label: t`Reminders`,
-        description: t`Enable the reminders to change your passwords`,
+        description: t`Get alerts when it's time to update your passwords.`,
         testIDOn: 'reminders-toggle-on',
         testIDOff: 'reminders-toggle-off',
         accessibilityLabelOn: t`Reminders enabled`,
@@ -42,20 +49,11 @@ export const PrivacySection = () => {
       {
         name: 'copyToClipboard',
         label: t`Copy to clipboard`,
-        description: t`When clicking a password you copy that into your clipboard`,
+        description: t`Copy any password instantly with one tap.`,
         testIDOn: 'copy-to-clipboard-toggle-on',
         testIDOff: 'copy-to-clipboard-toggle-off',
         accessibilityLabelOn: t`Copy to clipboard enabled`,
         accessibilityLabelOff: t`Copy to clipboard disabled`
-      },
-      {
-        name: 'haptics',
-        label: t`Haptic feedback`,
-        description: t`Enable vibration feedback when interacting with the app`,
-        testIDOn: 'haptics-toggle-on',
-        testIDOff: 'haptics-toggle-off',
-        accessibilityLabelOn: t`Haptic feedback enabled`,
-        accessibilityLabelOff: t`Haptic feedback disabled`
       }
     ]
 
@@ -63,7 +61,7 @@ export const PrivacySection = () => {
       options.push({
         name: 'biometrics',
         label: t`Unlock with biometrics`,
-        description: t`Unlock PearPass using the biometrics on your device`,
+        description: t`Use Face ID or fingerprint for faster, secure access.`,
         testIDOn: 'biometrics-toggle-on',
         testIDOff: 'biometrics-toggle-off',
         accessibilityLabelOn: t`Unlock with biometrics enabled`,
@@ -109,10 +107,6 @@ export const PrivacySection = () => {
       }
     }
 
-    if (newRules.haptics !== selectedRules.haptics) {
-      await setIsHapticsEnabled(newRules.haptics)
-    }
-
     setSelectedRules({ ...newRules })
   }
 
@@ -128,27 +122,90 @@ export const PrivacySection = () => {
       setSelectedRules({
         biometrics: isBiometricsEnabled,
         copyToClipboard: copyToClipboard !== 'false',
-        passwordChangeReminder: isPasswordChangeReminderEnabled,
-        haptics: isHapticsEnabled
+        passwordChangeReminder: isPasswordChangeReminderEnabled
       })
     }
 
     getInitialSettings()
-  }, [isBiometricsEnabled, isPasswordChangeReminderEnabled, isHapticsEnabled])
+  }, [isBiometricsEnabled, isPasswordChangeReminderEnabled])
+
+  const handleMasterEditClick = () => {
+    openModal(<ModifyMasterVaultModalContent />)
+  }
 
   return (
-    <CardSingleSetting title={t`Custom settings`}>
-      <Container>
-        <Description>
-          {t`Here you can choose your privacy settings and personalize your experience.`}
-        </Description>
-        <RuleSelector
-          rules={ruleOptions}
-          selectedRules={selectedRules}
-          setRules={handleSetRules}
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <View style={styles.header}>
+        <ButtonLittle
+          startIcon={BackIcon}
+          variant="secondary"
+          borderRadius="md"
+          onPress={() => navigation.goBack()}
         />
-        {AUTO_LOCK_ENABLED && <AutoLockSettings />}
-      </Container>
-    </CardSingleSetting>
+        <Text style={styles.screenTitle}>{t`Security`}</Text>
+      </View>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <CardSingleSetting title={t`Master Password`}>
+          <View style={styles.sectionContent}>
+            <Text style={styles.description}>
+              {t`Manage the password that protects your app.`}
+            </Text>
+            <ListItem
+              name={t`Master Vault`}
+              onEditClick={handleMasterEditClick}
+            />
+          </View>
+        </CardSingleSetting>
+
+        <CardSingleSetting title={t`PearPass functions`}>
+          <View style={styles.sectionContent}>
+            <Text style={styles.description}>
+              {t`Control how PearPass works and keep your vault secure.`}
+            </Text>
+            <RuleSelector
+              rules={ruleOptions}
+              selectedRules={selectedRules}
+              setRules={handleSetRules}
+            />
+            {AUTO_LOCK_ENABLED && <AutoLockSettings />}
+          </View>
+        </CardSingleSetting>
+      </ScrollView>
+    </SafeAreaView>
   )
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 0,
+    height: '100%',
+    gap: 20,
+    backgroundColor: colors.grey500.mode1
+  },
+  header: {
+    flexDirection: 'row',
+    gap: 20,
+    alignItems: 'center'
+  },
+  screenTitle: {
+    color: colors.white.mode1,
+    fontFamily: 'Inter',
+    fontSize: 20,
+    fontWeight: '700'
+  },
+  scrollContent: {
+    gap: 20,
+    paddingBottom: 40
+  },
+  sectionContent: {
+    gap: 15
+  },
+  description: {
+    color: colors.white.mode1,
+    fontFamily: 'Inter',
+    fontSize: 12,
+    fontWeight: '400'
+  }
+})
