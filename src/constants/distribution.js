@@ -1,6 +1,6 @@
 import Constants from 'expo-constants'
 
-export const DISTRIBUTION_CHANNEL =
+export const getDistributionChannel = () =>
   Constants.expoConfig?.extra?.distribution || 'standard'
 
-export const IS_FDROID = DISTRIBUTION_CHANNEL === 'fdroid'
+export const isFdroid = () => getDistributionChannel() === 'fdroid'

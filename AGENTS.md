@@ -10,4 +10,4 @@
 
 - `androidx.credentials:credentials-play-services-auth` is injected by `plugins/expo-autofill-plugin/src/android/withAndroidAutofillService.ts`. For F-Droid, prefer flavor/channel gating to remove this dependency.
 - Android update check currently scrapes the Play Store and redirects users to Play Store URLs. This must become channel-aware for F-Droid.
-
+- Version-check behavior is expected to differ by distribution; keep logic centralized and test it.
