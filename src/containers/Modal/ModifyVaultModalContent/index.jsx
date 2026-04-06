@@ -3,19 +3,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLingui } from '@lingui/react/macro'
 import { useForm } from '@tetherto/pear-apps-lib-ui-react-hooks'
 import { Validator } from '@tetherto/pear-apps-utils-validator'
+import { InputField, PasswordField } from '@tetherto/pearpass-lib-ui-kit'
 import { useVault } from '@tetherto/pearpass-lib-vault'
 import { validatePasswordChange } from '@tetherto/pearpass-utils-password-check'
 import { StyleSheet, Text, View } from 'react-native'
 import Toast from 'react-native-toast-message'
 
-import { InputPasswordPearPass } from '../../../libComponents'
-import { ModifyVaultsModaContentWrapper } from '../ModifyVaultsModaContentWrapper'
-import { InputLabel, InputWrapper } from './styles'
 import { TOAST_CONFIG } from '../../../constants/toast'
 import { VAULT_ACTION } from '../../../constants/vaultActions'
 import { useModal } from '../../../context/ModalContext'
 import { logger } from '../../../utils/logger'
 import { getVaultPasswordStrengthMeta } from '../../../utils/vaultFlow'
+import { ModifyVaultsModaContentWrapper } from '../ModifyVaultsModaContentWrapper'
 
 export const ModifyVaultModalContent = ({
   vaultId,
@@ -170,11 +169,11 @@ export const ModifyVaultModalContent = ({
       setIsProtected(result)
     }
     checkProtection()
-  }, [vaultId])
+  }, [isVaultProtected, vaultId])
 
   useEffect(() => {
     refetchVault()
-  }, [])
+  }, [refetchVault])
 
   const getTitle = () =>
     action === VAULT_ACTION.NAME ? t`Rename Vault` : t`Set Vault Password`
@@ -195,29 +194,23 @@ export const ModifyVaultModalContent = ({
             </Text>
           </View>
 
-          <InputWrapper>
-            <InputLabel>{t`Vault name`}</InputLabel>
-            <InputPasswordPearPass
-              {...nameField}
-              onChange={(value) => {
-                onNameChange(value)
-              }}
-              testID="change-vault-name-input"
-              accessibilityLabel={t`Vault name`}
-            />
-          </InputWrapper>
+          <InputField
+            label={t`Vault name`}
+            value={nameField.value || ''}
+            onChangeText={onNameChange}
+            variant={nameField.error ? 'error' : 'default'}
+            errorMessage={nameField.error}
+            testID="change-vault-name-input"
+          />
 
           {isProtected && (
-            <InputWrapper>
-              <InputLabel>{t`Current password`}</InputLabel>
-              <InputPasswordPearPass
-                isPassword
-                {...currentPasswordField}
-                onChange={(value) => {
-                  onCurrentPasswordChange(value)
-                }}
-              />
-            </InputWrapper>
+            <PasswordField
+              label={t`Current password`}
+              value={currentPasswordField.value || ''}
+              onChangeText={onCurrentPasswordChange}
+              variant={currentPasswordField.error ? 'error' : 'default'}
+              errorMessage={currentPasswordField.error}
+            />
           )}
         </>
       )}
@@ -232,29 +225,25 @@ export const ModifyVaultModalContent = ({
           </View>
 
           {isProtected && (
-            <InputWrapper>
-              <InputLabel>{t`Current password`}</InputLabel>
-              <InputPasswordPearPass
-                isPassword
-                {...currentPasswordField}
-                onChange={(value) => {
-                  onCurrentPasswordChange(value)
-                }}
-              />
-            </InputWrapper>
+            <PasswordField
+              label={t`Current password`}
+              value={currentPasswordField.value || ''}
+              onChangeText={onCurrentPasswordChange}
+              variant={currentPasswordField.error ? 'error' : 'default'}
+              errorMessage={currentPasswordField.error}
+            />
           )}
 
-          <InputWrapper>
-            <InputLabel>{t`New password`}</InputLabel>
-            <InputPasswordPearPass
-              isPassword
-              {...newPasswordField}
-              onChange={(value) => {
-                setNewPasswordValue(value)
-                onNewPasswordChange(value)
-              }}
-            />
-          </InputWrapper>
+          <PasswordField
+            label={t`New password`}
+            value={newPasswordField.value || ''}
+            onChangeText={(value) => {
+              setNewPasswordValue(value)
+              onNewPasswordChange(value)
+            }}
+            variant={newPasswordField.error ? 'error' : 'default'}
+            errorMessage={newPasswordField.error}
+          />
 
           <View style={styles.strengthCard}>
             <View style={styles.strengthHeader}>
@@ -311,16 +300,13 @@ export const ModifyVaultModalContent = ({
             </View>
           </View>
 
-          <InputWrapper>
-            <InputLabel>{t`Repeat new password`}</InputLabel>
-            <InputPasswordPearPass
-              isPassword
-              {...repeatPasswordField}
-              onChange={(value) => {
-                onRepeatPasswordChange(value)
-              }}
-            />
-          </InputWrapper>
+          <PasswordField
+            label={t`Repeat new password`}
+            value={repeatPasswordField.value || ''}
+            onChangeText={onRepeatPasswordChange}
+            variant={repeatPasswordField.error ? 'error' : 'default'}
+            errorMessage={repeatPasswordField.error}
+          />
         </>
       )}
     </ModifyVaultsModaContentWrapper>

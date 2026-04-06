@@ -1,9 +1,8 @@
 import { useLingui } from '@lingui/react/macro'
 import { PROTECTED_VAULT_ENABLED } from '@tetherto/pearpass-lib-constants'
+import { Button } from '@tetherto/pearpass-lib-ui-kit'
 import { colors } from '@tetherto/pearpass-lib-ui-theme-provider/native'
 import { View, Text, StyleSheet, ScrollView } from 'react-native'
-
-import { ButtonPrimary, ButtonSecondary } from '../../../libComponents'
 
 export const StepReview = ({ vaultData, onCreate, onBack }) => {
   const { t } = useLingui()
@@ -91,16 +90,23 @@ export const StepReview = ({ vaultData, onCreate, onBack }) => {
           </View>
 
           <View style={styles.buttons}>
-            <ButtonPrimary
-              stretch
-              onPress={onCreate}
+            <Button
+              variant="primary"
+              size="medium"
+              fullWidth
+              onClick={onCreate}
               testID="create-vault-button"
             >
               {t`Create Vault`}
-            </ButtonPrimary>
-            <ButtonSecondary stretch onPress={onBack}>
+            </Button>
+            <Button
+              variant="secondary"
+              size="medium"
+              fullWidth
+              onClick={onBack}
+            >
               {t`Back`}
-            </ButtonSecondary>
+            </Button>
           </View>
         </View>
       </ScrollView>

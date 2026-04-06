@@ -1,8 +1,22 @@
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet'
 import { useLingui } from '@lingui/react/macro'
 import { PROTECTED_VAULT_ENABLED } from '@tetherto/pearpass-lib-constants'
+import {
+  ListItem,
+  Text,
+  rawTokens,
+  useTheme
+} from '@tetherto/pearpass-lib-ui-kit'
+import {
+  KeyboardArrowRightOutlined,
+  LockOutlined,
+  Share,
+  Swap,
+  TrashOutlined,
+  VerifiedUser
+} from '@tetherto/pearpass-lib-ui-kit/icons'
 import { colors } from '@tetherto/pearpass-lib-ui-theme-provider'
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 
 import { useBottomSheet } from '../../context/BottomSheetContext'
 import { useHapticFeedback } from '../../hooks/useHapticFeedback'
@@ -24,6 +38,7 @@ export const BottomSheetVaultAction = ({
   onDelete
 }) => {
   const { t } = useLingui()
+  const { theme } = useTheme()
   const { collapse } = useBottomSheet()
   const { hapticButtonPrimary } = useHapticFeedback()
 
@@ -57,58 +72,81 @@ export const BottomSheetVaultAction = ({
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.buttonsContainer}>
-          <TouchableOpacity style={styles.button} onPress={handleName}>
-            <Text style={styles.buttonLabel}>{t`Rename Vault`}</Text>
-            <Text style={styles.buttonText}>
-              {t`Update the identity shown across devices.`}
-            </Text>
-          </TouchableOpacity>
+          <ListItem
+            title={t`Rename Vault`}
+            subtitle={t`Update the identity shown across devices.`}
+            icon={<Swap color={theme.colors.colorTextPrimary} />}
+            rightElement={
+              <KeyboardArrowRightOutlined
+                color={theme.colors.colorTextSecondary}
+              />
+            }
+            platform="mobile"
+            showDivider={false}
+            onClick={handleName}
+          />
           {PROTECTED_VAULT_ENABLED && (
-            <TouchableOpacity style={styles.button} onPress={handlePassword}>
-              <Text style={styles.buttonLabel}>{t`Set Vault Password`}</Text>
-              <Text style={styles.buttonText}>
-                {t`Add or rotate the extra encryption layer.`}
-              </Text>
-            </TouchableOpacity>
+            <ListItem
+              title={t`Set Vault Password`}
+              subtitle={t`Add or rotate the extra encryption layer.`}
+              icon={<LockOutlined color={theme.colors.colorTextPrimary} />}
+              rightElement={
+                <KeyboardArrowRightOutlined
+                  color={theme.colors.colorTextSecondary}
+                />
+              }
+              platform="mobile"
+              showDivider={false}
+              onClick={handlePassword}
+            />
           )}
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => {
+          <ListItem
+            title={t`Manage Access`}
+            subtitle={t`Review owner access and linked devices.`}
+            icon={<VerifiedUser color={theme.colors.colorTextPrimary} />}
+            rightElement={
+              <KeyboardArrowRightOutlined
+                color={theme.colors.colorTextSecondary}
+              />
+            }
+            platform="mobile"
+            showDivider={false}
+            onClick={() => {
               handleAction()
               onMembers?.()
             }}
-          >
-            <Text style={styles.buttonLabel}>{t`Manage Access`}</Text>
-            <Text style={styles.buttonText}>
-              {t`Review owner access and linked devices.`}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => {
+          />
+          <ListItem
+            title={t`Share Personal Vault`}
+            subtitle={t`Open the QR code flow for pairing a trusted device.`}
+            icon={<Share color={theme.colors.colorTextPrimary} />}
+            rightElement={
+              <KeyboardArrowRightOutlined
+                color={theme.colors.colorTextSecondary}
+              />
+            }
+            platform="mobile"
+            showDivider={false}
+            onClick={() => {
               handleAction()
               onShare?.()
             }}
-          >
-            <Text style={styles.buttonLabel}>{t`Share Personal Vault`}</Text>
-            <Text style={styles.buttonText}>
-              {t`Open the QR code flow for pairing a trusted device.`}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.buttonDanger]}
-            onPress={() => {
+          />
+          <ListItem
+            title={t`Delete Vault`}
+            subtitle={t`Requires master password confirmation before removal.`}
+            icon={<TrashOutlined color="#FCA5A5" />}
+            rightElement={
+              <KeyboardArrowRightOutlined color="rgba(252,165,165,0.82)" />
+            }
+            variant="destructive"
+            platform="mobile"
+            showDivider={false}
+            onClick={() => {
               handleAction()
               onDelete?.()
             }}
-          >
-            <Text style={[styles.buttonLabel, styles.buttonLabelDanger]}>
-              {t`Delete Vault`}
-            </Text>
-            <Text style={[styles.buttonText, styles.buttonTextDanger]}>
-              {t`Requires master password confirmation before removal.`}
-            </Text>
-          </TouchableOpacity>
+          />
         </View>
       </BottomSheetScrollView>
     </>
@@ -149,34 +187,6 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     marginTop: 8,
-    gap: 12
-  },
-  button: {
-    backgroundColor: '#12170D',
-    padding: 16,
-    borderRadius: 18,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)'
-  },
-  buttonDanger: {
-    borderColor: 'rgba(248,113,113,0.25)',
-    backgroundColor: 'rgba(127,29,29,0.16)'
-  },
-  buttonLabel: {
-    color: colors.white.mode1,
-    fontSize: 15,
-    fontWeight: '700'
-  },
-  buttonLabelDanger: {
-    color: '#FCA5A5'
-  },
-  buttonText: {
-    color: 'rgba(255,255,255,0.64)',
-    fontSize: 13,
-    lineHeight: 19
-  },
-  buttonTextDanger: {
-    color: 'rgba(252,165,165,0.82)'
+    gap: rawTokens.spacing12
   }
 })

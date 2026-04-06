@@ -335,6 +335,13 @@ export const CreateOrEditIdentityContent = ({
     setValue(fieldName, updatedAttachments)
   }
 
+  const handleAttachmentRename = (index, fieldName, newName) => {
+    const updatedAttachments = values[fieldName].map((attachment, idx) =>
+      idx === index ? { ...attachment, name: newName } : attachment
+    )
+    setValue(fieldName, updatedAttachments)
+  }
+
   return (
     <Wrapper>
       <Header>
@@ -539,8 +546,15 @@ export const CreateOrEditIdentityContent = ({
                 onRemove={(index) =>
                   handleAttachmentDelete(index, 'passportPicture')
                 }
+                onRename={(index, newName) =>
+                  handleAttachmentRename(index, 'passportPicture', newName)
+                }
                 title={t`Passport picture`}
                 pictures={values.passportPicture}
+                testID="passport-picture-field"
+                accessibilityLabel="Passport picture field"
+                addButtonTestID="add-passport-picture-button"
+                addButtonAccessibilityLabel="Add passport picture button"
               />
             )}
 
@@ -597,8 +611,15 @@ export const CreateOrEditIdentityContent = ({
                 onRemove={(index) =>
                   handleAttachmentDelete(index, 'idCardPicture')
                 }
+                onRename={(index, newName) =>
+                  handleAttachmentRename(index, 'idCardPicture', newName)
+                }
                 title={t`ID card picture`}
                 pictures={values.idCardPicture}
+                testID="id-card-picture-field"
+                accessibilityLabel="Id card picture field"
+                addButtonTestID="add-id-card-picture-button"
+                addButtonAccessibilityLabel="Add id card picture button"
               />
             )}
 
@@ -658,8 +679,19 @@ export const CreateOrEditIdentityContent = ({
                 onRemove={(index) =>
                   handleAttachmentDelete(index, 'drivingLicensePicture')
                 }
+                onRename={(index, newName) =>
+                  handleAttachmentRename(
+                    index,
+                    'drivingLicensePicture',
+                    newName
+                  )
+                }
                 title={t`Driving license picture`}
                 pictures={values.drivingLicensePicture}
+                testID="driving-license-picture-field"
+                accessibilityLabel="Driving license picture field"
+                addButtonTestID="add-driving-license-picture-button"
+                addButtonAccessibilityLabel="Add driving license picture button"
               />
             )}
 
@@ -668,20 +700,35 @@ export const CreateOrEditIdentityContent = ({
                 onUpload={(file) => handleFileUpload(file, 'attachments')}
                 isLast
                 label={'File'}
+                testID="add-file-field"
+                accessibilityLabel="Add file field"
+                textTestID="add-file-text"
+                textAccessibilityLabel="Add file text"
+                addButtonTestID="add-file-button"
+                addButtonAccessibilityLabel="Add file button"
               />
               {values.attachments.map((attachment, index) => (
                 <AttachmentField
                   key={attachment?.id || attachment.name}
                   attachment={attachment}
                   attachmentIndex={index}
-                  onDelete={(idx) => handleAttachmentDelete(idx, 'attachments')}
+                  onDelete={() => handleAttachmentDelete(index, 'attachments')}
                   isLast
                   label={'File'}
+                  testID="new-added-file-field"
+                  accessibilityLabel="New added file field"
+                  textTestID="new-added-file-text"
+                  textAccessibilityLabel="New added file text"
+                  onRename={(newName) =>
+                    handleAttachmentRename(index, 'attachments', newName)
+                  }
                   additionalItems={
                     <ButtonLittle
                       startIcon={DeleteIcon}
                       variant="secondary"
                       borderRadius="md"
+                      testID="delete-file-button"
+                      accessibilityLabel="Delete file button"
                       onPress={() =>
                         handleAttachmentDelete(index, 'attachments')
                       }
@@ -709,6 +756,8 @@ export const CreateOrEditIdentityContent = ({
             <FormGroup>
               <CreateCustomField
                 onCreateCustom={(type) => addItem({ type: type, name: type })}
+                testID="create-custom-field"
+                accessibilityLabel="Create custom field"
               />
             </FormGroup>
           </FormWrapper>
