@@ -16,7 +16,7 @@ import {
   VaultProvider
 } from '@tetherto/pearpass-lib-vault'
 import { StatusBar } from 'expo-status-bar'
-import { Text } from 'react-native'
+import { StyleSheet, Text } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 
 import { App } from './app/App'
@@ -68,53 +68,16 @@ export const Main = () => {
     return (
       <UIKitProvider>
         <StatusBar backgroundColor={colors.grey500.mode1} style="light" />
-        <GestureHandlerRootView
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: colors.grey500.mode1,
-            paddingHorizontal: 24
-          }}
-        >
+        <GestureHandlerRootView style={styles.loadingScreen}>
           {initError ? (
             <>
-              <Text
-                style={{
-                  color: colors.white.mode1,
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  fontWeight: '700',
-                  marginBottom: 12,
-                  textAlign: 'center'
-                }}
-              >
-                PearPass failed to start
-              </Text>
-              <Text
-                style={{
-                  color: colors.white.mode1,
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  fontWeight: '500',
-                  opacity: 0.8,
-                  textAlign: 'center'
-                }}
-              >
+              <Text style={styles.errorTitle}>PearPass failed to start</Text>
+              <Text style={styles.errorMessage}>
                 {String(initError?.message || initError)}
               </Text>
             </>
           ) : (
-            <Text
-              style={{
-                color: colors.white.mode1,
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: '600'
-              }}
-            >
-              Initializing…
-            </Text>
+            <Text style={styles.loadingText}>Initializing…</Text>
           )}
         </GestureHandlerRootView>
       </UIKitProvider>
@@ -131,7 +94,7 @@ export const Main = () => {
         <ThemeProvider>
           <HapticsProvider>
             <LoadingProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
+              <GestureHandlerRootView style={styles.appRoot}>
                 <BottomSheetWrapper>
                   <VaultProvider>
                     <SharedFilterProvider>
@@ -157,3 +120,38 @@ export const Main = () => {
     </UIKitProvider>
   )
 }
+
+const styles = StyleSheet.create({
+  appRoot: {
+    flex: 1
+  },
+  loadingScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.grey500.mode1,
+    paddingHorizontal: 24
+  },
+  errorTitle: {
+    color: colors.white.mode1,
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center'
+  },
+  errorMessage: {
+    color: colors.white.mode1,
+    fontFamily: 'Inter',
+    fontSize: 12,
+    fontWeight: '500',
+    opacity: 0.8,
+    textAlign: 'center'
+  },
+  loadingText: {
+    color: colors.white.mode1,
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '600'
+  }
+})

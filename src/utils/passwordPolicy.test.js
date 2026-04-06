@@ -1,10 +1,27 @@
+import { i18n } from '@lingui/core'
+
 import {
+  PASSWORD_VALIDATION_MESSAGES,
+  getPasswordValidationMessages,
   getPasswordIndicatorVariant,
   getPasswordsMatch,
   getPasswordStrengthMeta
 } from './passwordPolicy'
+import { messages } from '../locales/en/messages'
+
+i18n.load('en', messages)
+i18n.activate('en')
 
 describe('passwordPolicy', () => {
+  it('returns extraction-safe validation messages with fallback strings', () => {
+    expect(getPasswordValidationMessages()).toEqual(
+      PASSWORD_VALIDATION_MESSAGES
+    )
+    expect(getPasswordValidationMessages((message) => i18n._(message))).toEqual(
+      PASSWORD_VALIDATION_MESSAGES
+    )
+  })
+
   it('returns idle metadata when password is empty', () => {
     expect(getPasswordStrengthMeta('')).toEqual({
       result: null,

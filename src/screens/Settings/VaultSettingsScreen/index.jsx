@@ -113,8 +113,8 @@ export const VaultSettingsScreen = ({ route }) => {
   const [isProtected, setIsProtected] = useState(false)
 
   const accessEntries = useMemo(
-    () => buildVaultAccessEntries({ devices: vault?.devices }),
-    [vault?.devices]
+    () => buildVaultAccessEntries({ devices: vault?.devices, translate: t }),
+    [t, vault?.devices]
   )
 
   const linkedDevicesCount = accessEntries.filter(
@@ -150,10 +150,7 @@ export const VaultSettingsScreen = ({ route }) => {
 
   const handleShare = () => {
     collapse?.()
-    navigation.navigate('VaultShareScreen', {
-      vaultId,
-      vaultName
-    })
+    navigation.navigate('VaultShareScreen')
   }
 
   const handleRemoveAccess = (entry) => {
@@ -201,7 +198,6 @@ export const VaultSettingsScreen = ({ route }) => {
     expand({
       children: (
         <BottomSheetVaultAction
-          vaultId={vaultId}
           vaultName={vaultName}
           onRename={handleRename}
           onPassword={handlePassword}

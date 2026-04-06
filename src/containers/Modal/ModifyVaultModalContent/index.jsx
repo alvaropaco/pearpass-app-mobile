@@ -13,7 +13,7 @@ import { TOAST_CONFIG } from '../../../constants/toast'
 import { VAULT_ACTION } from '../../../constants/vaultActions'
 import { useModal } from '../../../context/ModalContext'
 import { logger } from '../../../utils/logger'
-import { getVaultPasswordStrengthMeta } from '../../../utils/vaultFlow'
+import { getPasswordStrengthMeta } from '../../../utils/passwordPolicy'
 import { ModifyVaultsModaContentWrapper } from '../ModifyVaultsModaContentWrapper'
 
 export const ModifyVaultModalContent = ({
@@ -88,7 +88,7 @@ export const ModifyVaultModalContent = ({
   })
 
   const passwordStrengthMeta = useMemo(
-    () => getVaultPasswordStrengthMeta(newPasswordValue, passwordErrors),
+    () => getPasswordStrengthMeta(newPasswordValue, passwordErrors),
     [newPasswordValue, passwordErrors]
   )
 

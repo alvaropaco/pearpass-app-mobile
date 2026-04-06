@@ -1,15 +1,6 @@
-import { getPasswordStrengthMeta } from './passwordPolicy'
+import { msg } from '@lingui/core/macro'
 
-export const getVaultPasswordStrengthMeta = (password, errors = {}) => {
-  const meta = getPasswordStrengthMeta(password, errors)
-
-  return {
-    result: meta.result,
-    progress: meta.progress,
-    color: meta.color,
-    tone: meta.tone
-  }
-}
+const OWNER_LABEL = msg`You`
 
 export const getVaultScreenState = ({
   isSubmitting = false,
@@ -37,11 +28,11 @@ export const getVaultScreenState = ({
   return 'idle'
 }
 
-export const buildVaultAccessEntries = ({ devices = [] } = {}) => [
+export const buildVaultAccessEntries = ({ devices = [], translate } = {}) => [
   {
     id: 'owner',
     kind: 'owner',
-    name: 'You',
+    name: translate?.(OWNER_LABEL) || 'You',
     role: 'admin',
     status: 'active',
     removable: false

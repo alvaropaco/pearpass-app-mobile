@@ -1,27 +1,12 @@
-import {
-  buildVaultAccessEntries,
-  getVaultPasswordStrengthMeta,
-  getVaultScreenState
-} from './vaultFlow'
+import { i18n } from '@lingui/core'
+
+import { buildVaultAccessEntries, getVaultScreenState } from './vaultFlow'
+import { messages } from '../locales/en/messages'
+
+i18n.load('en', messages)
+i18n.activate('en')
 
 describe('vaultFlow', () => {
-  it('returns idle password strength metadata when password is empty', () => {
-    expect(getVaultPasswordStrengthMeta('')).toEqual({
-      result: null,
-      progress: 0,
-      color: '#2B3320',
-      tone: 'idle'
-    })
-  })
-
-  it('returns success metadata for a strong password', () => {
-    const meta = getVaultPasswordStrengthMeta('StrongVault#2026')
-
-    expect(meta.result?.success).toBe(true)
-    expect(meta.progress).toBe(1)
-    expect(meta.tone).toBe('success')
-  })
-
   it('derives screen state from validation state', () => {
     expect(
       getVaultScreenState({
@@ -52,13 +37,15 @@ describe('vaultFlow', () => {
       devices: [
         { name: 'iOS 18', createdAt: 111 },
         { name: 'Android 15', createdAt: 222 }
-      ]
+      ],
+      translate: (message) => i18n._(message)
     })
 
     expect(entries).toHaveLength(3)
     expect(entries[0]).toMatchObject({
       id: 'owner',
       kind: 'owner',
+      name: 'You',
       role: 'admin',
       removable: false
     })

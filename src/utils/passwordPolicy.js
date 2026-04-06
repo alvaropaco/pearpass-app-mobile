@@ -1,3 +1,4 @@
+import { msg } from '@lingui/core/macro'
 import { checkPasswordStrength } from '@tetherto/pearpass-utils-password-check'
 
 const PASSWORD_STRENGTH_META = {
@@ -29,21 +30,29 @@ export const PASSWORD_VALIDATION_MESSAGES = {
   hasSymbols: 'Password must contain at least one special character'
 }
 
+const PASSWORD_VALIDATION_MESSAGE_DESCRIPTORS = {
+  minLength: msg`Password must be at least 8 characters long`,
+  hasLowerCase: msg`Password must contain at least one lowercase letter`,
+  hasUpperCase: msg`Password must contain at least one uppercase letter`,
+  hasNumbers: msg`Password must contain at least one number`,
+  hasSymbols: msg`Password must contain at least one special character`
+}
+
 export const getPasswordValidationMessages = (translate) => ({
   minLength:
-    translate?.(PASSWORD_VALIDATION_MESSAGES.minLength) ||
+    translate?.(PASSWORD_VALIDATION_MESSAGE_DESCRIPTORS.minLength) ||
     PASSWORD_VALIDATION_MESSAGES.minLength,
   hasLowerCase:
-    translate?.(PASSWORD_VALIDATION_MESSAGES.hasLowerCase) ||
+    translate?.(PASSWORD_VALIDATION_MESSAGE_DESCRIPTORS.hasLowerCase) ||
     PASSWORD_VALIDATION_MESSAGES.hasLowerCase,
   hasUpperCase:
-    translate?.(PASSWORD_VALIDATION_MESSAGES.hasUpperCase) ||
+    translate?.(PASSWORD_VALIDATION_MESSAGE_DESCRIPTORS.hasUpperCase) ||
     PASSWORD_VALIDATION_MESSAGES.hasUpperCase,
   hasNumbers:
-    translate?.(PASSWORD_VALIDATION_MESSAGES.hasNumbers) ||
+    translate?.(PASSWORD_VALIDATION_MESSAGE_DESCRIPTORS.hasNumbers) ||
     PASSWORD_VALIDATION_MESSAGES.hasNumbers,
   hasSymbols:
-    translate?.(PASSWORD_VALIDATION_MESSAGES.hasSymbols) ||
+    translate?.(PASSWORD_VALIDATION_MESSAGE_DESCRIPTORS.hasSymbols) ||
     PASSWORD_VALIDATION_MESSAGES.hasSymbols
 })
 
