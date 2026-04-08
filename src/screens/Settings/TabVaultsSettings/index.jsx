@@ -32,7 +32,10 @@ export const VaultsManageSection = () => {
           date={vault.createdAt}
           testID={`vault-item-${vault.id}`}
           accessibilityLabel={`vault-item-${vault.id}`}
-          onPress={() => handleVaultEditClick(vault.id, vault.name)}
+          nameTestID="vault-name"
+          nameAccessibilityLabel="Vault Name"
+          dateTestID="vault-date"
+          dateAccessibilityLabel="Vault Date"
           onEditClick={() => handleVaultEditClick(vault.id, vault.name)}
         />
       </View>

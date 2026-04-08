@@ -18,6 +18,9 @@ import {
   View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { isV2 } from 'src/utils/designVersion'
+
+import { SettingsV2 } from './SettingsV2'
 
 const MenuItem = ({ label, icon: Icon, onPress }) => (
   <TouchableOpacity style={styles.menuItem} onPress={onPress}>
@@ -27,6 +30,10 @@ const MenuItem = ({ label, icon: Icon, onPress }) => (
 )
 
 export const Settings = () => {
+  if (isV2()) {
+    return <SettingsV2 />
+  }
+
   const { t } = useLingui()
   const navigation = useNavigation()
   const { data: vault } = useVault()
