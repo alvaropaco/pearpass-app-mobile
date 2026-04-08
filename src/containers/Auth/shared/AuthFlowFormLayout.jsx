@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 
-import { Text, Title, useTheme } from '@tetherto/pearpass-lib-ui-kit'
-import { colors } from '@tetherto/pearpass-lib-ui-theme-provider/native'
+import { Text, Title, rawTokens, useTheme } from '@tetherto/pearpass-lib-ui-kit'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -68,14 +67,28 @@ export const AuthFlowFormLayout = ({
           >
             <View style={[styles.content, contentStyle]}>
               {showTitle ? (
-                <Title style={styles.title} data-testid={titleTestID}>
+                <Title
+                  style={[
+                    styles.title,
+                    { color: theme.colors.colorTextPrimary }
+                  ]}
+                  data-testid={titleTestID}
+                >
                   {title}
                 </Title>
               ) : null}
 
               {subtitle ? (
                 <Text
-                  style={[styles.subtitle, onBack && styles.subtitleWithBack]}
+                  style={[
+                    styles.subtitle,
+                    onBack && styles.subtitleWithBack,
+                    {
+                      color: onBack
+                        ? theme.colors.colorTextSecondary
+                        : theme.colors.colorTextPrimary
+                    }
+                  ]}
                   data-testid={subtitleTestID}
                 >
                   {subtitle}
@@ -92,7 +105,9 @@ export const AuthFlowFormLayout = ({
                 styles.bottomSection,
                 {
                   backgroundColor: theme.colors.colorSurfacePrimary,
-                  paddingBottom: Math.max(insets.bottom, 16)
+                  paddingBottom: Math.max(insets.bottom, rawTokens.spacing16),
+                  borderTopColor: theme.colors.colorBorderPrimary,
+                  shadowColor: theme.colors.colorTextPrimary
                 },
                 isScrollable && styles.bottomSectionElevated
               ]}
@@ -113,36 +128,31 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     flexGrow: 1,
-    paddingHorizontal: 16
+    paddingHorizontal: rawTokens.spacing16
   },
   content: {
-    paddingTop: 40,
-    gap: 20
+    paddingTop: rawTokens.spacing20 * 2,
+    gap: rawTokens.spacing20
   },
   title: {
     fontFamily:
       Platform.OS === 'android' ? 'humble-nostalgia' : 'Humble Nostalgia',
-    color: colors.white.mode1,
     textAlign: 'center'
   },
   subtitle: {
-    color: colors.white.mode1,
     textAlign: 'center'
   },
   subtitleWithBack: {
-    color: '#BDC3AC',
     textAlign: 'left',
     lineHeight: 20
   },
   bottomSection: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    gap: 16
+    paddingHorizontal: rawTokens.spacing16,
+    paddingTop: rawTokens.spacing16,
+    gap: rawTokens.spacing16
   },
   bottomSectionElevated: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    shadowColor: '#000000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.3,
     shadowRadius: 8
