@@ -1,11 +1,13 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { DeleteFolderV2 } from 'src/screens/DeleteFolder/DeleteFolderv2'
 import { ImportItems } from 'src/screens/ImportItems'
 
 import {
-  AuthV2PinScreen,
-  AuthV2MasterPasswordScreen
+  AuthV2MasterPasswordScreen,
+  AuthV2PinScreen
 } from '../../screens/AuthV2'
 import { CreateFolder } from '../../screens/CreateFolder'
+import { CreateFolderV2 } from '../../screens/CreateFolder/CreateFolderV2'
 import { CreateRecord } from '../../screens/CreateRecord'
 import { CreatePasswordItemV2 } from '../../screens/CreateRecord/v2/CreatePasswordItemV2'
 import { ErrorScreen } from '../../screens/ErrorScreen'
@@ -108,7 +110,10 @@ export const Navigation = ({ initialRouteName }) => (
     />
     <Stack.Screen name="CreatePasswordItem" component={CreatePasswordItemV2} />
     <Stack.Screen name="CreateRecord" component={CreateRecord} />
-    <Stack.Screen name="CreateFolder" component={CreateFolder} />
+    <Stack.Screen
+      name="CreateFolder"
+      component={isV2() ? CreateFolderV2 : CreateFolder}
+    />
     <Stack.Screen name="MasterPassword" component={MasterPassword} />
     <Stack.Screen name="BlindPeering" component={BlindPeeringSectionV2} />
     <Stack.Screen name="ImportVault" component={ImportVault} />
@@ -121,5 +126,6 @@ export const Navigation = ({ initialRouteName }) => (
     <Stack.Screen name="ImportItems" component={ImportItems} />
     <Stack.Screen name="Vaults2" component={VaultsV2} />
     <Stack.Screen name="MyDevices" component={MyDevices} />
+    <Stack.Screen name="DeleteFolder" component={DeleteFolderV2} />
   </Stack.Navigator>
 )
