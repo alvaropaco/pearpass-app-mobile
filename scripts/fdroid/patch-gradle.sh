@@ -10,20 +10,34 @@ cd "$repo_root/android"
 
 # --- Remove Google Play / Firebase / ML Kit dependencies ---
 
-perl -i -ne "print unless /credentials-play-services-auth|play-services-auth|googleid|play-services-fido|firebase-messaging|play-services-mlkit|barcode-scanning|play-services-base|play-services-basement|play-services-tasks/" app/build.gradle
+google_dep_re='com\.google\.android\.gms|com\.google\.mlkit|com\.google\.firebase|com\.google\.android\.datatransport|play-services-|firebase-|googleid|credentials-play-services-auth|barcode-scanning'
+
+perl -i -ne "print unless /$google_dep_re/" app/build.gradle
 
 # Produce unsigned APKs — F-Droid signs with its own key
 rm -f app/debug.keystore
 sed -i.bak 's/signingConfig signingConfigs.debug/signingConfig null/' app/build.gradle && rm -f app/build.gradle.bak
 perl -0777 -i -pe 's/\s*signingConfigs\s*\{\s*debug\s*\{[^}]*\}\s*\}//' app/build.gradle
 
-find . ../node_modules -name '*.gradle' -type f -exec perl -i -ne "print unless /firebase-messaging|com\\.google\\.firebase\\.messaging/" {} +
-find . ../node_modules -name '*.gradle.kts' -type f -exec perl -i -ne "print unless /firebase-messaging|com\\.google\\.firebase\\.messaging/" {} +
+find . ../node_modules -name '*.gradle' -type f -exec perl -i -ne "print unless /$google_dep_re/" {} +
+find . ../node_modules -name '*.gradle.kts' -type f -exec perl -i -ne "print unless /$google_dep_re/" {} +
 rm -f app/google-services.json
 perl -i -ne "print unless /com\\.google\\.gms\\.google-services/" app/build.gradle build.gradle
 
 if ! grep -q "fdroid-root-excludes" build.gradle; then
-  printf '\n// fdroid-root-excludes\nsubprojects {\n  configurations.all {\n    exclude group: "com.google.firebase"\n    exclude group: "com.google.firebase", module: "firebase-messaging"\n  }\n}\n' >> build.gradle
+  cat >> build.gradle <<'ROOTEXCL'
+
+// fdroid-root-excludes
+allprojects {
+  configurations.all {
+    exclude group: "com.google.firebase"
+    exclude group: "com.google.android.gms"
+    exclude group: "com.google.mlkit"
+    exclude group: "com.google.android.datatransport"
+    exclude group: "androidx.credentials", module: "credentials-play-services-auth"
+  }
+}
+ROOTEXCL
 fi
 
 if ! grep -q "fdroid-global-excludes" app/build.gradle; then
