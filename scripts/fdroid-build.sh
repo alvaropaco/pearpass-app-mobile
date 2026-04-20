@@ -30,63 +30,18 @@ module.exports = class SwarmConfig {
 EOF
 }
 
-write_expo_camera_stub() {
-  rm -rf node_modules/expo-camera
-  mkdir -p node_modules/expo-camera
-  cat > node_modules/expo-camera/package.json <<'EOF'
-{
-  "name": "expo-camera",
-  "version": "16.1.11-fdroid",
-  "main": "index.js",
-  "expo": {
-    "plugin": "./app.plugin.js"
-  }
-}
-EOF
-  cat > node_modules/expo-camera/app.plugin.js <<'EOF'
-module.exports = (config) => config
-EOF
-  cat > node_modules/expo-camera/index.js <<'EOF'
-const PermissionStatus = {
-  GRANTED: "granted",
-  DENIED: "denied"
-}
-
-const Camera = {
-  async getCameraPermissionsAsync() {
-    return { status: PermissionStatus.DENIED }
-  },
-  async requestCameraPermissionsAsync() {
-    return { status: PermissionStatus.DENIED, canAskAgain: false }
-  },
-  async scanFromURLAsync() {
-    return []
-  }
-}
-
-function CameraView() {
-  return null
-}
-
-module.exports = {
-  Camera,
-  CameraView,
-  PermissionStatus
-}
-EOF
-}
+google_dep_re='com\.google\.android\.gms|com\.google\.mlkit|com\.google\.firebase|com\.google\.android\.datatransport|play-services-|firebase-|googleid|credentials-play-services-auth|barcode-scanning|camera-mlkit-vision'
 
 run_prebuild() {
   npm cache clean --force 2>/dev/null || true
   npm ci --install-links --legacy-peer-deps --no-audit --no-fund
   write_swarmconf_stub
-  write_expo_camera_stub
   npm run fdroid:patches:prebuild
   npm run build
   ./node_modules/.bin/expo prebuild --platform android --clean --no-install
   perl -0777 -i -pe "s/def reactNativeAndroidDir = new File\\([\\s\\S]*?\\n\\)\\n\\n//g" android/build.gradle
   perl -0777 -i -pe "s/\\n\\s*maven \\{\\n\\s*\\/\\/ All of React Native[^\\n]*\\n\\s*url\\(reactNativeAndroidDir\\)\\n\\s*\\}\\n/\\n/g" android/build.gradle
-  perl -i -ne "print unless /credentials-play-services-auth|play-services-auth|googleid|play-services-fido|firebase-messaging/" android/app/build.gradle
+  perl -i -ne "print unless /$google_dep_re/" android/app/build.gradle
 }
 
 ensure_java_home() {
@@ -151,17 +106,29 @@ run_build() {
   export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--no-experimental-strip-types"
 
   cd android
-  perl -i -ne "print unless /credentials-play-services-auth|play-services-auth|googleid|play-services-fido|firebase-messaging|play-services-mlkit|barcode-scanning|play-services-base|play-services-basement|play-services-tasks/" app/build.gradle
+  perl -i -ne "print unless /$google_dep_re/" app/build.gradle
   # Produce unsigned APKs — F-Droid signs with its own key
   rm -f app/debug.keystore
   sed -i.bak 's/signingConfig signingConfigs.debug/signingConfig null/' app/build.gradle && rm -f app/build.gradle.bak
   perl -0777 -i -pe 's/\s*signingConfigs\s*\{\s*debug\s*\{[^}]*\}\s*\}//' app/build.gradle
-  find . ../node_modules -name '*.gradle' -type f -exec perl -i -ne "print unless /firebase-messaging|com\\.google\\.firebase\\.messaging/" {} +
-  find . ../node_modules -name '*.gradle.kts' -type f -exec perl -i -ne "print unless /firebase-messaging|com\\.google\\.firebase\\.messaging/" {} +
+  find . ../node_modules -name '*.gradle' -type f -exec perl -i -ne "print unless /$google_dep_re/" {} +
+  find . ../node_modules -name '*.gradle.kts' -type f -exec perl -i -ne "print unless /$google_dep_re/" {} +
   rm -f app/google-services.json
   perl -i -ne "print unless /com\\.google\\.gms\\.google-services/" app/build.gradle build.gradle
   if ! grep -q "fdroid-root-excludes" build.gradle; then
-    printf '\n// fdroid-root-excludes\nsubprojects {\n  configurations.all {\n    exclude group: "com.google.firebase"\n    exclude group: "com.google.firebase", module: "firebase-messaging"\n  }\n}\n' >> build.gradle
+    cat >> build.gradle <<'ROOTEXCL'
+
+// fdroid-root-excludes
+allprojects {
+  configurations.all {
+    exclude group: "com.google.firebase"
+    exclude group: "com.google.android.gms"
+    exclude group: "com.google.mlkit"
+    exclude group: "com.google.android.datatransport"
+    exclude group: "androidx.credentials", module: "credentials-play-services-auth"
+  }
+}
+ROOTEXCL
   fi
   if ! grep -q "fdroid-global-excludes" app/build.gradle; then
     printf '\n// fdroid-global-excludes\nconfigurations.matching { it.name.contains("Runtime") || it.name.contains("runtime") }.all {\n  exclude group: "com.google.firebase"\n  exclude group: "com.google.android.gms"\n  exclude group: "com.google.mlkit"\n  exclude group: "com.google.android.datatransport"\n  exclude group: "androidx.credentials", module: "credentials-play-services-auth"\n}\n' >> app/build.gradle

@@ -165,7 +165,6 @@ export const useQRScanner = ({
     [isScanning, supportedTypes, scanDelay, onScanned]
   )
 
-  // ZXing format name → expo-camera-style short name
   const mapFormat = (zxingFormat) => {
     const formatMap = {
       QR_CODE: 'qr',
