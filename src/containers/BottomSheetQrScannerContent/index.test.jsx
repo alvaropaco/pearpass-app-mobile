@@ -1,7 +1,7 @@
 import { i18n } from '@lingui/core'
 import { I18nProvider } from '@lingui/react'
 import { render } from '@testing-library/react-native'
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
 import { ThemeProvider } from 'styled-components/native'
 
 import { BottomSheetQrScannerContent } from './index'
