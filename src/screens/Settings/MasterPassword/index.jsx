@@ -11,7 +11,6 @@ import {
   PasswordField,
   rawTokens
 } from '@tetherto/pearpass-lib-ui-kit'
-import { ReportProblem } from '@tetherto/pearpass-lib-ui-kit/icons'
 import { useUserData } from '@tetherto/pearpass-lib-vault'
 import {
   clearBuffer,
@@ -26,6 +25,7 @@ import Toast from 'react-native-toast-message'
 import { Layout } from 'src/containers/Layout'
 import { BackScreenHeader } from 'src/containers/ScreenHeader/BackScreenHeader'
 
+import { PasswordStrengthIndicator } from './PasswordStrengthIndicator'
 import { logger } from '../../../utils/logger'
 
 const STRENGTH_TO_INDICATOR = {
@@ -169,7 +169,12 @@ export const MasterPassword = () => {
           onChangeText={currentPasswordField.onChange}
           variant={currentPasswordField.error ? 'error' : 'default'}
           errorMessage={currentPasswordField.error}
-          passwordIndicator={getPasswordStrength(currentPasswordField.value)}
+          rightSlot={
+            <PasswordStrengthIndicator
+              variant={getPasswordStrength(currentPasswordField.value)}
+              fieldKey="current_password"
+            />
+          }
         />
 
         <PasswordField
@@ -179,7 +184,12 @@ export const MasterPassword = () => {
           onChangeText={newPasswordField.onChange}
           variant={newPasswordField.error ? 'error' : 'default'}
           errorMessage={newPasswordField.error}
-          passwordIndicator={getPasswordStrength(newPasswordField.value)}
+          rightSlot={
+            <PasswordStrengthIndicator
+              variant={getPasswordStrength(newPasswordField.value)}
+              fieldKey="new_password"
+            />
+          }
         />
 
         <PasswordField
@@ -189,17 +199,21 @@ export const MasterPassword = () => {
           onChangeText={repeatPasswordField.onChange}
           variant={repeatPasswordField.error ? 'error' : 'default'}
           errorMessage={repeatPasswordField.error}
-          passwordIndicator={getRepeatIndicator(
-            newPasswordField.value,
-            repeatPasswordField.value
-          )}
+          rightSlot={
+            <PasswordStrengthIndicator
+              variant={getRepeatIndicator(
+                newPasswordField.value,
+                repeatPasswordField.value
+              )}
+              fieldKey="repeat_password"
+            />
+          }
         />
 
         <AlertMessage
           variant="warning"
           size="small"
           description={t`Don't forget your Master password. It's the only way to access your vault. We can't help recover it. Back it up securely.`}
-          icon={<ReportProblem />}
         />
       </View>
     </Layout>
